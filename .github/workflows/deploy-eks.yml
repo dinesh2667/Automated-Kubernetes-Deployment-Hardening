@@ -1,4 +1,4 @@
-name: Create EKS Cluster
+name: Deploy to EKS
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  create-eks-cluster:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,31 +20,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Update AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-
-      - name: Verify AWS CLI Installation
-        run: aws --version
-
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
-
       - name: Install eksctl
         run: |
-          curl -sSL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
-          sudo mv /tmp/eksctl /usr/local/bin/
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
 
-      - name: Create EKS Cluster
+      - name: Check if EKS Cluster Exists
         run: |
-          eksctl create cluster --name my-cluster --region ap-south-1 --nodegroup-name my-nodes --nodes 2 --nodes-min 1 --nodes-max 3 --managed
+          if eksctl get cluster --name my-cluster --region ap-south-1; then
+            echo "Cluster already exists, skipping creation."
+            exit 0
+          fi
 
-      - name: Verify Cluster
-        run: |
-          aws eks --region ap-south-1 update-kubeconfig --name my-cluster
-          kubectl get nodes
+      - name: Create EKS Cluster (if not exists)
+        run: eksctl create cluster --name my-cluster --region ap-south-1
+
+      - name: Update Kubeconfig
+        run: aws eks --region ap-south-1 update-kubeconfig --name my-cluster
+
+      - name: Deploy Application
+        run: kubectl apply -f k8s/
+
+      - name: Verify Deployment
+        run: kubectl get pods -o wide
