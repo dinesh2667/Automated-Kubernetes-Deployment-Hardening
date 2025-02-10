@@ -27,7 +27,7 @@ jobs:
 
       - name: Install kubectl
         run: |
-          curl -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/2023-09-28/bin/linux/amd64/kubectl
+          curl -o kubectl https://s3.ap-south-1.amazonaws.com/amazon-eks/2023-09-28/bin/linux/amd64/kubectl
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
@@ -35,14 +35,14 @@ jobs:
         run: |
           eksctl create cluster \
             --name my-cluster \
-            --region us-west-2 \
+            --region ap-south-1 \
             --nodegroup-name my-node-group \
             --node-type t3.medium \
             --nodes 2
 
       - name: Verify Cluster
         run: |
-          aws eks --region us-west-2 update-kubeconfig --name my-cluster
+          aws eks --region ap-south-1 update-kubeconfig --name my-cluster
           kubectl get nodes
 
       - name: Post Configure AWS Credentials
