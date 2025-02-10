@@ -1,4 +1,4 @@
-name: Deploy to EKS
+name: EKS Cluster Deployment
 
 on:
   push:
@@ -6,12 +6,11 @@ on:
       - main
 
 jobs:
-  deploy:
+  create-cluster:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -20,26 +19,35 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
+      - name: Install AWS CLI
+        run: |
+          if ! aws --version &> /dev/null; then
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+          fi
+
       - name: Install eksctl
         run: |
-          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-          sudo mv /tmp/eksctl /usr/local/bin
+          if ! eksctl version &> /dev/null; then
+            curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+            sudo mv /tmp/eksctl /usr/local/bin
+          fi
 
       - name: Check if EKS Cluster Exists
         run: |
-          if eksctl get cluster --name my-cluster --region ap-south-1; then
-            echo "Cluster already exists, skipping creation."
-            exit 0
+          eksctl get cluster --name=my-cluster --region=ap-south-1 || echo "Cluster does not exist"
+
+      - name: Create or Update EKS Cluster
+        run: |
+          if eksctl get cluster --name=my-cluster --region=ap-south-1; then
+            echo "Cluster exists. Updating..."
+            eksctl upgrade cluster --name=my-cluster --region=ap-south-1 --approve
+          else
+            echo "Cluster does not exist. Creating..."
+            eksctl create cluster --name=my-cluster --region=ap-south-1
           fi
 
-      - name: Create EKS Cluster (if not exists)
-        run: eksctl create cluster --name my-cluster --region ap-south-1
-
-      - name: Update Kubeconfig
-        run: aws eks --region ap-south-1 update-kubeconfig --name my-cluster
-
-      - name: Deploy Application
-        run: kubectl apply -f k8s/
-
-      - name: Verify Deployment
-        run: kubectl get pods -o wide
+      - name: Verify Cluster
+        run: |
+          kubectl get nodes
