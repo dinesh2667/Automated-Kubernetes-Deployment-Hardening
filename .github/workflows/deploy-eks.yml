@@ -48,6 +48,10 @@ jobs:
             eksctl create cluster --name=my-cluster --region=ap-south-1
           fi
 
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ap-south-1 --name my-cluster
+
       - name: Verify Cluster
         run: |
           kubectl get nodes
